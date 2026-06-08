@@ -1,0 +1,124 @@
+"""Application entry point: FastAPI app factory and uvicorn launch helpers."""
+
+import importlib.metadata
+
+import uvicorn
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+
+from medialab_jellyfin.core.config import config
+from medialab_jellyfin.core.errors import AppException, ErrorCode
+from medialab_jellyfin.core.limiter import limiter
+from medialab_jellyfin.core.logger import app_logger
+from medialab_jellyfin.core.middleware import RequestLoggingMiddleware
+from medialab_jellyfin.routers import system
+
+app: FastAPI = FastAPI(
+    title="Medialab Jellyfin API",
+    version=importlib.metadata.version("medialab-jellyfin"),
+    description=(
+        "FastAPI microservice wrapping the Jellyfin media server API. "
+        "Exposes endpoints for library scan triggers and library path management. "
+        "Intended to be called by an orchestrating service such as a Discord bot "
+        "or workflow coordinator.\n\n"
+        "All endpoints except `/api/v1/health` require an `X-API-Key` header. "
+        "Rate limit: 60 req/min."
+    ),
+    contact={"name": "Michael Marchand", "url": "https://github.com/MickMarch/medialab-jellyfin"},
+    openapi_tags=[
+        {"name": "System", "description": "Health and operational status."},
+        {"name": "Library", "description": "Library scan triggers and path management."},
+    ],
+)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    retry_after: int = exc.limit.limit.GRANULARITY.seconds
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "status": "error",
+            "code": ErrorCode.RATE_LIMITED.value,
+            "detail": f"Rate limit exceeded. Retry after {retry_after} seconds.",
+        },
+    )
+    response.headers["Retry-After"] = str(retry_after)
+    return response
+
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"status": "error", "code": exc.code.value, "detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(
+        status_code=422,
+        content={"status": "error", "code": ErrorCode.INVALID_INPUT.value, "detail": str(exc)},
+    )
+
+app.include_router(system.router, prefix="/api/v1")
+
+
+def custom_openapi() -> dict:
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        contact=app.contact,
+        tags=app.openapi_tags,
+        routes=app.routes,
+    )
+    for path, methods in schema.get("paths", {}).items():
+        for method, operation in methods.items():
+            if path == "/api/v1/health":
+                operation["security"] = []
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
+
+
+def main() -> None:
+    """Start the production uvicorn server."""
+    app_logger.info("Starting Medialab Jellyfin API Server...")
+    uvicorn.run(
+        "medialab_jellyfin.main:app", host=config.api_host, port=config.api_port
+    )
+
+
+def dev() -> None:
+    """Start the uvicorn server with hot-reload enabled for local development."""
+    app_logger.info("Starting Medialab Jellyfin API Server in DEV MODE...")
+    uvicorn.run(
+        "medialab_jellyfin.main:app",
+        host=config.api_host,
+        port=config.api_port,
+        reload=True,
+    )
+
+
+if __name__ == "__main__":
+    main()

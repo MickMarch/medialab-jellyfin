@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "medialab-jellyfin"
+dynamic = ["version"]
+description = "FastAPI microservice wrapping the Jellyfin API for library management automation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.1",
+    "pydantic-settings>=2.14.1",
+    "requests>=2.34.0",
+    "slowapi>=0.1.9",
+    "uvicorn>=0.46.0",
+]
+
+[project.scripts]
+medialab-jellyfin = "medialab_jellyfin.main:main"
+medialab-jellyfin-dev = "medialab_jellyfin.main:dev"
+
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/medialab_jellyfin/_version.py"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "pytest>=9.0.3",
+    "pytest-mock>=3.15.1",
+]

@@ -60,13 +60,56 @@ FastAPI REST API wrapping the Jellyfin media server API. Status: scaffolding onl
 
 **OpenAPI:** Custom `openapi()` override in `main.py` sets `/health` security to `[]` (no auth required). All other routes inherit `APIKeyHeader` security scheme auto-generated from the `Security(APIKeyHeader)` dependency. Error response shapes declared via `responses=` on each route using `ErrorResponse` schema.
 
-## Planned endpoints (not yet implemented)
+## Planned endpoints (spec - not yet implemented)
 
-- `POST /api/v1/library/scan` — trigger a Jellyfin library scan (`POST /Library/Media/Updated`)
-- `POST /api/v1/library/paths` — add a local directory to a Jellyfin library
-- `GET /api/v1/library/items` — search library contents (`GET /Items`)
+Verified against a live Jellyfin v10.11.8 instance via `/api-docs/openapi.json`. Require a new `library` router, `library` schemas, and expanded `services/jellyfin.py` coverage.
 
-These require a `library` router, `library` schemas, and expanded `services/jellyfin.py` coverage. Spec these against the actual Jellyfin instance's library configuration before implementing.
+### `POST /api/v1/library/scan`
+
+Maps to `POST /Library/Media/Updated`.
+
+Request body:
+```json
+{
+  "path": "/data/movies/Foo (2024)",
+  "update_type": "Created"
+}
+```
+- `update_type`: `Created` | `Modified` | `Deleted`
+- Forwards to Jellyfin as `{"Updates": [{"Path": ..., "UpdateType": ...}]}`
+- Jellyfin returns 204 on success - mirror as 204
+
+### `POST /api/v1/library/paths`
+
+Maps to `POST /Library/VirtualFolders/Paths?refreshLibrary=<bool>` (MediaPathDto: `{"Name": "<library>", "Path": "<path>"}`).
+
+Request body:
+```json
+{
+  "media_type": "movie",
+  "path": "/data/movies/Foo (2024)",
+  "refresh_library": true,
+  "library_name": null
+}
+```
+- `media_type`: `movie` | `show` - used to resolve the target Jellyfin library
+- `library_name`: optional override (see resolution below)
+- `refresh_library`: optional, default `false`, passed through as Jellyfin's `refreshLibrary` query param
+
+**Library resolution (dynamic discovery, no env config):** call `GET /Library/VirtualFolders`, filter by `CollectionType` (`media_type=movie` -> `movies`, `media_type=show` -> `tvshows`). If exactly one match, use its `Name`. If `library_name` is provided, use it directly without discovery. If zero or multiple matches and no `library_name` given, return a structured error (new `ErrorCode`, e.g. `LIBRARY_NOT_FOUND` / `LIBRARY_AMBIGUOUS`).
+
+This keeps Jellyfin itself as the source of truth for library names - no `JELLYFIN_MOVIES_LIBRARY`/`JELLYFIN_TV_LIBRARY` env vars, avoiding config drift if libraries are renamed in the Jellyfin UI.
+
+### `GET /api/v1/library/items`
+
+Maps to `GET /Items`. Thin passthrough of a small parameter subset (the full `/Items` surface has 50+ filters):
+- `search_term` -> `searchTerm`
+- `include_item_types` -> `includeItemTypes` (e.g. `Movie`, `Series`, `Episode`)
+- `recursive` -> `recursive`
+- `parent_id` -> `parentId`
+- `limit` -> `limit`
+
+Returns Jellyfin's `BaseItemDtoQueryResult` shape (`Items[]` + `TotalRecordCount`), reshaped through our own response schema for consistency with other endpoints' error/response conventions.
 
 ## Versioning
 

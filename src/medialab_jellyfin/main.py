@@ -3,18 +3,19 @@
 import importlib.metadata
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from medialab_jellyfin.core.config import config
+from medialab_jellyfin.core.auth import verify_api_key
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.limiter import limiter
 from medialab_jellyfin.core.logger import app_logger
 from medialab_jellyfin.core.middleware import RequestLoggingMiddleware
-from medialab_jellyfin.routers import system
+from medialab_jellyfin.routers import library, system
 
 app: FastAPI = FastAPI(
     title="Medialab Jellyfin API",
@@ -76,6 +77,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 app.include_router(system.router, prefix="/api/v1")
+app.include_router(library.router, prefix="/api/v1", dependencies=[Depends(verify_api_key)])
 
 
 def custom_openapi() -> dict:

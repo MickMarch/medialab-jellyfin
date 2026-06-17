@@ -75,6 +75,16 @@ class TestLibraryScan:
 
         assert response.status_code == 422
 
+    def test_scan_rejects_empty_path(self, client):
+        response = client.post(SCAN_URL, json={"path": ""})
+
+        assert response.status_code == 422
+
+    def test_scan_rejects_whitespace_path(self, client):
+        response = client.post(SCAN_URL, json={"path": "   "})
+
+        assert response.status_code == 422
+
     def test_scan_requires_api_key(self, unauthed_client):
         response = unauthed_client.post(SCAN_URL, json={"path": "/data/movies/Foo (2024)"})
 
@@ -158,6 +168,26 @@ class TestLibraryPaths:
 
         assert response.status_code == 409
         assert response.json()["code"] == "LIBRARY_AMBIGUOUS"
+
+    def test_add_path_rejects_empty_path(self, client):
+        response = client.post(PATHS_URL, json={"media_type": "movie", "path": ""})
+
+        assert response.status_code == 422
+
+    def test_add_path_rejects_whitespace_path(self, client):
+        response = client.post(PATHS_URL, json={"media_type": "movie", "path": "   "})
+
+        assert response.status_code == 422
+
+    def test_add_path_rejects_empty_library_name(self, client):
+        response = client.post(PATHS_URL, json={"media_type": "movie", "path": "/data/movies/Foo (2024)", "library_name": ""})
+
+        assert response.status_code == 422
+
+    def test_add_path_rejects_whitespace_library_name(self, client):
+        response = client.post(PATHS_URL, json={"media_type": "movie", "path": "/data/movies/Foo (2024)", "library_name": "   "})
+
+        assert response.status_code == 422
 
     def test_add_path_requires_api_key(self, unauthed_client):
         response = unauthed_client.post(PATHS_URL, json={"media_type": "movie", "path": "/data/movies/Foo (2024)"})

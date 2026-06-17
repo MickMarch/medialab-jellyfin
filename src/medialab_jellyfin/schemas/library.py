@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class UpdateType(str, Enum):
@@ -20,12 +20,33 @@ class ScanRequest(BaseModel):
     path: str
     update_type: UpdateType = UpdateType.CREATED
 
+    @field_validator("path")
+    @classmethod
+    def path_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("path must not be empty")
+        return v
+
 
 class AddPathRequest(BaseModel):
     media_type: MediaType
     path: str
     refresh_library: bool = False
     library_name: str | None = None
+
+    @field_validator("path")
+    @classmethod
+    def path_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("path must not be empty")
+        return v
+
+    @field_validator("library_name")
+    @classmethod
+    def library_name_must_not_be_empty(cls, v: str | None) -> str | None:
+        if v is not None and not v.strip():
+            raise ValueError("library_name must not be empty if provided")
+        return v
 
 
 class JellyfinVirtualFolder(BaseModel):

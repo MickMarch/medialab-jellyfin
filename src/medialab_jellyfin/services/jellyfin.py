@@ -6,7 +6,6 @@ from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.logger import app_logger
 from medialab_jellyfin.schemas.library import (
-    JellyfinItem,
     JellyfinItemsResult,
     JellyfinVirtualFolder,
 )

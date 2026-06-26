@@ -4,7 +4,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi import status as fastapi_status
 
 from medialab_jellyfin.core.constants import TAG_LIBRARY
-from medialab_jellyfin.core.limiter import limiter, RATE_LIMIT_DEFAULT
+from medialab_jellyfin.core.limiter import RATE_LIMIT_DEFAULT, limiter
 from medialab_jellyfin.schemas.errors import ErrorResponse
 from medialab_jellyfin.schemas.library import (
     AddPathRequest,
@@ -41,7 +41,10 @@ def scan_library(request: Request, body: ScanRequest) -> None:
     responses={
         **_ERROR_RESPONSES,
         404: {"model": ErrorResponse, "description": "No library found for the given media_type."},
-        409: {"model": ErrorResponse, "description": "Multiple libraries match; provide library_name to disambiguate."},
+        409: {
+            "model": ErrorResponse,
+            "description": "Multiple libraries match; provide library_name to disambiguate.",
+        },
     },
 )
 @limiter.limit(RATE_LIMIT_DEFAULT)

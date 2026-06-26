@@ -10,9 +10,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.136.1",
-    "pydantic-settings>=2.14.1",
+    "pydantic-settings>=2.14.2",
     "requests>=2.34.0",
     "slowapi>=0.1.9",
+    "starlette>=1.3.1",
     "uvicorn>=0.46.0",
 ]
 
@@ -30,6 +31,41 @@ version-file = "src/medialab_jellyfin/_version.py"
 [dependency-groups]
 dev = [
     "httpx>=0.28.0",
+    "mypy>=1.13.0",
     "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
+    "ruff>=0.8.0",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PLR2004"]
+# UP042: keep `(str, Enum)` rather than `StrEnum` - consistent across all
+# services and the future medialab-contracts shared enums.
+ignore = ["UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+
+# The router `responses=` dicts predate the mypy gate; this is annotation
+# accuracy, not a behavior bug. Relaxed to land the standards backfill; remove
+# when the router response maps are typed as dict[int | str, ...].
+[[tool.mypy.overrides]]
+module = ["medialab_jellyfin.routers.*"]
+disable_error_code = ["dict-item"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: requires real secrets or a live external service; skipped in CI",
 ]

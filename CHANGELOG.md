@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-06-29
+
 ### Added
 
+- Library router: `POST /api/v1/library/scan` (trigger a Jellyfin library scan),
+  `POST /api/v1/library/paths` (register a directory with a library, resolving
+  the target library dynamically from `GET /Library/VirtualFolders` by
+  `CollectionType`, with an optional `library_name` override), and
+  `GET /api/v1/library/items` (search library contents). Verified against a live
+  Jellyfin v10.11.8 instance.
 - Project scaffolding: FastAPI app factory, structured error responses, static API key authentication, per-IP rate limiting, request logging middleware with `X-Request-ID` header, and `/api/v1/health` endpoint reporting Jellyfin reachability.
 - Dockerfile with non-root user and two-stage uv install for minimal image size.
 - GitHub Actions CI running pytest on push to main and PRs targeting main.

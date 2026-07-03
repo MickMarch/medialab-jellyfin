@@ -9,7 +9,7 @@ description = "FastAPI microservice wrapping the Jellyfin API for library manage
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.136.1",
+    "fastapi>=0.139.0",
     "pydantic-settings>=2.14.2",
     "requests>=2.34.0",
     "slowapi>=0.1.9",

@@ -31,7 +31,7 @@ version-file = "src/medialab_jellyfin/_version.py"
 [dependency-groups]
 dev = [
     "httpx>=0.28.0",
-    "mypy>=1.13.0",
+    "mypy>=2.2.0",
     "pytest>=9.0.3",
     "pytest-mock>=3.15.1",
     "ruff>=0.8.0",

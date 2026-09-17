@@ -1,125 +1,62 @@
-# CLAUDE.md
+# CLAUDE.md - medialab-jellyfin
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Workspace rules, conventions, standards and workflow live in the root
+[`medialab/CLAUDE.md`](../CLAUDE.md); it is the authority when anything here
+disagrees. This file holds only what is specific to this code.
 
 ## Commands
 
 ```bash
-# Install dependencies
 uv sync --dev
-
-# Run API (production)
-uv run medialab-jellyfin
-
-# Run API (dev, hot-reload)
-uv run medialab-jellyfin-dev
-
-# Run all tests
+uv run medialab-jellyfin        # production
+uv run medialab-jellyfin-dev    # dev, hot-reload
 uv run pytest
-
-# Run single test
 uv run pytest tests/test_system.py::TestHealthCheck::test_returns_uptime
 ```
 
-## Environment Setup
+## Config
 
-Copy `.env.example` to `.env` and populate. All config loads via `pydantic-settings` from `.env`.
-
-All fields are optional at import time (for CI compatibility), but the service will not function correctly without real values at runtime.
-
-- `JELLYFIN_API_KEY` — Jellyfin API key, generated in the Jellyfin dashboard under Administration → API Keys
-- `API_KEY` — static key required in `X-API-Key` header on all protected endpoints
-
-Optional (defaults shown):
-- `JELLYFIN_HOST=127.0.0.1`, `JELLYFIN_PORT=8096`
-- `API_HOST=0.0.0.0`, `API_PORT=8001`
+`.env.example` is the authoritative variable list; `core/config.py` holds the
+defaults. Every field is optional at import time and required at runtime.
+Inside a container `JELLYFIN_HOST` must be `host.docker.internal`, not
+`127.0.0.1` (that would be the container itself).
 
 ## Architecture
 
-FastAPI REST API wrapping the Jellyfin media server API. Status: scaffolding only — library endpoints (scan trigger, add path to library) not yet implemented.
+Thin FastAPI proxy over the Jellyfin server API. It assumes Jellyfin is
+reachable; availability and workflow belong to the orchestrator. Endpoint
+table: [README](README.md).
 
-**Auth:** All endpoints except `/api/v1/health` require `X-API-Key: <API_KEY>`. Implemented in `core/auth.py` via FastAPI `Security(APIKeyHeader)`. Missing key → 403 with `UNAUTHORIZED` code. Wrong key → 403 with `UNAUTHORIZED` code. Applied via `dependencies=[Depends(verify_api_key)]` on `include_router` calls in `main.py`; system routes stay public so `/health` is reachable without a key.
+**Library resolution (`POST /library/paths`):** the target library is
+discovered dynamically from `GET /Library/VirtualFolders` filtered by
+`CollectionType` (`movie` -> `movies`, `show` -> `tvshows`). Exactly one match
+is used; `library_name` overrides discovery; zero or several matches without
+an override return a structured error. Jellyfin stays the source of truth for
+library names, so no `JELLYFIN_*_LIBRARY` env vars exist. This endpoint is for
+one-time setup; the per-download pipeline only calls `/library/scan`.
 
-**Rate limiting:** `slowapi` limiter in `core/limiter.py`. All endpoints: `RATE_LIMIT_DEFAULT` (60/min). `/health` exempt via `@limiter.exempt`. Applied via `@limiter.limit(RATE_LIMIT_DEFAULT)` decorator on each route handler. Breach returns 429 with `Retry-After` header and `RATE_LIMITED` error code. Limiter storage must be reset between tests - see `reset_rate_limiter` fixture in `conftest.py`.
+**Cross-cutting:** `X-API-Key` via `Security(APIKeyHeader)` in `core/auth.py`,
+applied on `include_router` (system router public so `/health` needs no key).
+`slowapi` `RATE_LIMIT_DEFAULT` in `core/limiter.py`, `/health` exempt.
+`RequestLoggingMiddleware` adds `X-Request-ID`. Errors are `AppException` +
+`ErrorCode`.
 
-**Request logging:** `core/middleware.py` - `RequestLoggingMiddleware` logs method, path+query, status, duration on every request. Injects `X-Request-ID` UUID response header per request for cross-service correlation.
+## Module layout
 
-**Error handling:** `core/errors.py` defines `ErrorCode` enum and `AppException`. All structured errors use shape `{"status": "error", "code": "<ErrorCode>", "detail": "..."}`. Exception handlers registered in `main.py` for `AppException`, `RequestValidationError`, and `RateLimitExceeded`. `schemas/errors.py` holds `ErrorResponse` Pydantic model used in `responses=` on route decorators for OpenAPI documentation.
-
-**Module layout:**
-- `core/config.py` — single `AppConfig` pydantic-settings instance (`config`) imported everywhere
-- `core/auth.py` — `verify_api_key` FastAPI dependency; patch `medialab_jellyfin.core.auth.config` in tests
-- `core/limiter.py` — `limiter` slowapi instance, `RATE_LIMIT_DEFAULT` constant
-- `core/middleware.py` — `RequestLoggingMiddleware` (BaseHTTPMiddleware)
-- `core/logger.py` — `app_logger` singleton; stdout only (no file handler - correct for containers)
-- `core/errors.py` — `ErrorCode` enum, `AppException`
-- `services/jellyfin.py` — Jellyfin API client: connection setup, reachability checks, library operations
-- `schemas/` — Pydantic models for request/response validation; `errors.py` holds shared `ErrorResponse`
-- `routers/` — APIRouter modules grouped by domain (`system`); registered in `main.py` via `include_router` with `prefix="/api/v1"`
-- `main.py` — FastAPI app instantiation, middleware stack, exception handlers, router registration, custom OpenAPI schema, uvicorn entrypoints
-
-**OpenAPI:** Custom `openapi()` override in `main.py` sets `/health` security to `[]` (no auth required). All other routes inherit `APIKeyHeader` security scheme auto-generated from the `Security(APIKeyHeader)` dependency. Error response shapes declared via `responses=` on each route using `ErrorResponse` schema.
-
-## Planned endpoints (spec - not yet implemented)
-
-Verified against a live Jellyfin v10.11.8 instance via `/api-docs/openapi.json`. Require a new `library` router, `library` schemas, and expanded `services/jellyfin.py` coverage.
-
-### `POST /api/v1/library/scan`
-
-Maps to `POST /Library/Media/Updated`.
-
-Request body:
-```json
-{
-  "path": "/data/movies/Foo (2024)",
-  "update_type": "Created"
-}
 ```
-- `update_type`: `Created` | `Modified` | `Deleted`
-- Forwards to Jellyfin as `{"Updates": [{"Path": ..., "UpdateType": ...}]}`
-- Jellyfin returns 204 on success - mirror as 204
-
-### `POST /api/v1/library/paths`
-
-Maps to `POST /Library/VirtualFolders/Paths?refreshLibrary=<bool>` (MediaPathDto: `{"Name": "<library>", "Path": "<path>"}`).
-
-Request body:
-```json
-{
-  "media_type": "movie",
-  "path": "/data/movies/Foo (2024)",
-  "refresh_library": true,
-  "library_name": null
-}
+src/medialab_jellyfin/
+├── core/        config, auth, limiter, middleware, logger, errors, constants
+├── services/    jellyfin (client, reachability, library operations)
+├── schemas/     library (scan/paths/items request + response, Jellyfin DTOs),
+│                system, errors
+├── routers/     system, library (registered in main.py under /api/v1)
+└── main.py      app, middleware, exception handlers, custom OpenAPI
 ```
-- `media_type`: `movie` | `show` - used to resolve the target Jellyfin library
-- `library_name`: optional override (see resolution below)
-- `refresh_library`: optional, default `false`, passed through as Jellyfin's `refreshLibrary` query param
-
-**Library resolution (dynamic discovery, no env config):** call `GET /Library/VirtualFolders`, filter by `CollectionType` (`media_type=movie` -> `movies`, `media_type=show` -> `tvshows`). If exactly one match, use its `Name`. If `library_name` is provided, use it directly without discovery. If zero or multiple matches and no `library_name` given, return a structured error (new `ErrorCode`, e.g. `LIBRARY_NOT_FOUND` / `LIBRARY_AMBIGUOUS`).
-
-This keeps Jellyfin itself as the source of truth for library names - no `JELLYFIN_MOVIES_LIBRARY`/`JELLYFIN_TV_LIBRARY` env vars, avoiding config drift if libraries are renamed in the Jellyfin UI.
-
-### `GET /api/v1/library/items`
-
-Maps to `GET /Items`. Thin passthrough of a small parameter subset (the full `/Items` surface has 50+ filters):
-- `search_term` -> `searchTerm`
-- `include_item_types` -> `includeItemTypes` (e.g. `Movie`, `Series`, `Episode`)
-- `recursive` -> `recursive`
-- `parent_id` -> `parentId`
-- `limit` -> `limit`
-
-Returns Jellyfin's `BaseItemDtoQueryResult` shape (`Items[]` + `TotalRecordCount`), reshaped through our own response schema for consistency with other endpoints' error/response conventions.
-
-## Versioning
-
-Version is derived from git tags via `hatch-vcs` - do not hardcode it anywhere. `src/medialab_jellyfin/_version.py` is generated at build time and is gitignored. To release a new version: merge to main, tag (`git tag -a vX.Y.Z -m "vX.Y.Z"`), push the tag (`git push origin vX.Y.Z`), create a GitHub Release from the tag, update `CHANGELOG.md` before tagging.
 
 ## Testing patterns
 
-- Always use `uv run pytest`, never `python -m pytest`
-- Always pytest style, never unittest
-- `conftest.py` has two `autouse=True` fixtures: `patch_api_key` (mocks auth config) and `reset_rate_limiter` (clears limiter storage between tests)
-- `client` fixture sends `X-API-Key` header by default; use `unauthed_client` fixture for auth rejection tests
-- Mock `medialab_jellyfin.core.auth.config` (not `core.config`) when patching auth
-- Mock `medialab_jellyfin.core.middleware.app_logger` when asserting on log output
+- `conftest.py` autouse fixtures: `patch_api_key` and `reset_rate_limiter`.
+- `client` fixture sends `X-API-Key`; `unauthed_client` for rejection tests.
+- Patch `medialab_jellyfin.core.auth.config` (not `core.config`) for auth;
+  patch `medialab_jellyfin.core.middleware.app_logger` for log assertions.
+- Jellyfin is mocked at the service boundary. Nothing live.

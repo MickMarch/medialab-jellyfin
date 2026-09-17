@@ -1,96 +1,54 @@
-# Medialab Jellyfin
+# medialab-jellyfin
 
-A FastAPI microservice that wraps the Jellyfin media server API. Exposes a REST API for triggering library scans and managing library paths — intended to be called by an external orchestrator (e.g. a Discord bot or workflow coordinator) that handles cross-service automation such as post-download library updates.
-
----
+FastAPI microservice wrapping the Jellyfin media server API for the
+[medialab](https://github.com/MickMarch/medialab) suite. Triggers library
+scans, registers library paths, and searches items. It is a downstream worker:
+only the medialab-orchestrator calls it.
 
 ## Prerequisites
 
-### Jellyfin
-
-1. Install and run [Jellyfin](https://jellyfin.org/downloads).
-2. Sign in to the Jellyfin dashboard and go to **Administration → API Keys**.
-3. Generate an API key and copy it.
-4. Note the host and port Jellyfin is running on (default: `8096`).
-
-### Python
-
-Requires Python 3.12+. Install [uv](https://github.com/astral-sh/uv) (recommended) or use pip.
-
----
+Install and run [Jellyfin](https://jellyfin.org/downloads). In the dashboard,
+**Administration > API Keys**, generate a key. Note the host and port
+(default `8096`).
 
 ## Setup
 
-### 1. Clone and install dependencies
-
 ```bash
-git clone <repo-url>
-cd medialab-jellyfin
 uv sync --dev
-# or: pip install -e ".[dev]"
+cp .env.example .env     # then fill in the values
+uv run medialab-jellyfin-dev   # dev, hot-reload
+uv run medialab-jellyfin       # production
 ```
 
-### 2. Configure environment variables
+`.env.example` documents every variable. Interactive docs at `/docs`.
 
-Copy the example env file and populate it:
+The service runs as a container from the workspace `docker-compose.yml`; see
+the [workspace README](../README.md). Inside a container `JELLYFIN_HOST` must be
+`host.docker.internal`.
 
-```bash
-cp .env.example .env
-```
+## API
 
-Edit `.env`:
+All paths under `/api/v1`. Every endpoint except `/health` requires
+`X-API-Key: <API_KEY>`; a missing or wrong key returns `403` with
+`"code": "UNAUTHORIZED"`.
 
-```env
-# Jellyfin
-JELLYFIN_HOST=127.0.0.1
-JELLYFIN_PORT=8096
-JELLYFIN_API_KEY=your_jellyfin_api_key
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Public. Uptime and Jellyfin reachability. |
+| `POST` | `/library/scan` | Body `{path, update_type?}` (`Created` default, `Modified`, `Deleted`). Forwards to Jellyfin `POST /Library/Media/Updated`. Returns `204`. |
+| `POST` | `/library/paths` | Body `{media_type, path, refresh_library?, library_name?}`. Adds a directory to the matching library (`POST /Library/VirtualFolders/Paths`). Library resolved from `media_type` via `GET /Library/VirtualFolders`; `library_name` overrides; ambiguous or missing returns `LIBRARY_AMBIGUOUS` / `LIBRARY_NOT_FOUND`. Setup-time use, not per download. |
+| `GET` | `/library/items` | Query `search_term`, `include_item_types`, `recursive`, `parent_id`, `limit`. Passthrough of a small `GET /Items` subset, reshaped to `{items, total_record_count}`. |
 
-# API authentication
-API_KEY=your_api_key
+Errors: `{"status": "error", "code": "<ErrorCode>", "detail": "..."}`. Rate
+limit 60/min per IP; `429` carries `Retry-After`. Every response includes an
+`X-Request-ID` UUID.
 
-# Optional — defaults shown
-API_HOST=0.0.0.0
-API_PORT=8001
-```
-
-### 3. Run
-
-```bash
-# Development (hot-reload)
-uv run medialab-jellyfin-dev
-
-# Production
-uv run medialab-jellyfin
-```
-
-The API serves interactive documentation at `/docs` and the OpenAPI schema at `/openapi.json`.
-
----
-
-## API Overview
-
-- `GET /api/v1/health` — public, no auth. Reports uptime and Jellyfin reachability.
-
-All other endpoints require an `X-API-Key` header matching the configured `API_KEY`.
-
-Error responses follow the shape `{"status": "error", "code": "<ErrorCode>", "detail": "..."}`.
-
-Rate limit: 60 requests/minute per client IP. Exceeding it returns `429` with a `Retry-After` header.
-
-Every response includes an `X-Request-ID` UUID header for cross-service call correlation.
-
----
-
-## Testing
+## Development
 
 ```bash
 uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run mypy src
 ```
 
-## Docker
-
-```bash
-docker build -t medialab-jellyfin --build-arg APP_VERSION=$(git describe --tags --always) .
-docker run -p 8001:8001 --env-file .env medialab-jellyfin
-```
+Standards, workflow and release process: [workspace CLAUDE.md](../CLAUDE.md).
+Code-local notes: [CLAUDE.md](CLAUDE.md).

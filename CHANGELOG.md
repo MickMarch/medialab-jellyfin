@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pushed tag (shared `release.yml`).
 - Dependabot updates arrive grouped, one PR per ecosystem.
 
+### Fixed
+
+- `.env.example` `API_HOST` default matches the code (`0.0.0.0`).
+
 ## [1.0.0] - 2026-06-29
 
 ### Added

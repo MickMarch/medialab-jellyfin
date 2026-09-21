@@ -7,6 +7,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from medialab_contracts import API_PREFIX, HEALTH_PATH
 from slowapi.errors import RateLimitExceeded
 
 from medialab_jellyfin.core.auth import verify_api_key
@@ -82,8 +83,8 @@ async def validation_exception_handler(
     )
 
 
-app.include_router(system.router, prefix="/api/v1")
-app.include_router(library.router, prefix="/api/v1", dependencies=[Depends(verify_api_key)])
+app.include_router(system.router, prefix=API_PREFIX)
+app.include_router(library.router, prefix=API_PREFIX, dependencies=[Depends(verify_api_key)])
 
 
 def custom_openapi() -> dict:
@@ -101,7 +102,7 @@ def custom_openapi() -> dict:
     )
     for path, methods in schema.get("paths", {}).items():
         for operation in methods.values():
-            if path == "/api/v1/health":
+            if path == HEALTH_PATH:
                 operation["security"] = []
     app.openapi_schema = schema
     return schema

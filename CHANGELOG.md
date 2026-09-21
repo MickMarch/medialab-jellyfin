@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- medialab-contracts v0.4.0 dependency (git is now installed in the image build
+  stage to clone it).
+
+### Changed
+
+- `MediaType` and the shared error codes come from medialab-contracts; the
+  hand-copied enum and `CommonErrorCode` values are removed. `API_PREFIX`,
+  `API_KEY_HEADER` and `HEALTH_PATH` imported likewise. Wire values unchanged.
+
 ### Changed
 
 - CI calls the workspace's shared reusable workflow (`MickMarch/medialab`

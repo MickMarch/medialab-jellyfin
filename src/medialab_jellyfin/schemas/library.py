@@ -2,6 +2,7 @@
 
 from enum import Enum
 
+from medialab_contracts import MediaType
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -9,11 +10,6 @@ class UpdateType(str, Enum):
     CREATED = "Created"
     MODIFIED = "Modified"
     DELETED = "Deleted"
-
-
-class MediaType(str, Enum):
-    MOVIE = "movie"
-    SHOW = "show"
 
 
 class ScanRequest(BaseModel):

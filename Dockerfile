@@ -5,7 +5,12 @@ LABEL org.opencontainers.image.version=$APP_VERSION
 
 WORKDIR /app
 
-RUN pip install uv --no-cache-dir
+# git is required at build time: medialab-contracts is a git-ref uv dependency,
+# so uv sync must clone it. Kept in the image build only, not a runtime need.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install uv --no-cache-dir
 
 COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --no-dev --frozen --no-cache --no-install-project

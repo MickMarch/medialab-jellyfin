@@ -1,1 +1,1 @@
-"""medialab-jellyfin — FastAPI microservice for Jellyfin library management."""
+"""medialab-jellyfin - FastAPI microservice for Jellyfin library management."""

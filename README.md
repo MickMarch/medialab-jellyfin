@@ -2,7 +2,7 @@
 
 FastAPI microservice wrapping the Jellyfin media server API for the
 [medialab](https://github.com/MickMarch/medialab) suite. Triggers library
-scans, registers library paths, and searches items. It is a downstream worker:
+scans, registers library paths, searches items, and lists the TMDB ids in the library. It is a downstream worker:
 only the medialab-orchestrator calls it.
 
 ## Prerequisites
@@ -38,6 +38,7 @@ All paths under `/api/v1`. Every endpoint except `/health` requires
 | `POST` | `/library/scan` | Body `{path, update_type?}` (`Created` default, `Modified`, `Deleted`). Forwards to Jellyfin `POST /Library/Media/Updated`. Returns `204`. |
 | `POST` | `/library/paths` | Body `{media_type, path, refresh_library?, library_name?}`. Adds a directory to the matching library (`POST /Library/VirtualFolders/Paths`). Library resolved from `media_type` via `GET /Library/VirtualFolders`; `library_name` overrides; ambiguous or missing returns `LIBRARY_AMBIGUOUS` / `LIBRARY_NOT_FOUND`. Setup-time use, not per download. |
 | `GET` | `/library/items` | Query `search_term`, `include_item_types`, `recursive`, `parent_id`, `limit`. Passthrough of a small `GET /Items` subset, reshaped to `{items, total_record_count}`. |
+| `GET` | `/library/tmdb-ids` | Query `media_type` (`movie` or `show`). TMDB ids of every Movie or Series item (`GET /Items` with `ProviderIds`), deduplicated; items without a numeric TMDB id are skipped. Returns `{media_type, tmdb_ids}`. |
 
 Errors: `{"status": "error", "code": "<ErrorCode>", "detail": "..."}`. Rate
 limit 60/min per IP; `429` carries `Retry-After`. Every response includes an

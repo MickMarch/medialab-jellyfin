@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/v1/library/tmdb-ids?media_type=<movie|show>` lists the distinct TMDB
+  ids of every Movie or Series item in the library, as the contracts
+  `LibraryTmdbIdsResponse` (MickMarch/medialab#81).
+
+### Changed
+
+- medialab-contracts dependency bumped to v0.8.0.
+
 ## [1.1.0] - 2026-09-21
 
 ### Added

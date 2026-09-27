@@ -1,7 +1,8 @@
-"""Library router: scan trigger, path management, and item search endpoints."""
+"""Library router: scan trigger, path management, item search, and TMDB id listing."""
 
 from fastapi import APIRouter, Query, Request
 from fastapi import status as fastapi_status
+from medialab_contracts import LibraryTmdbIdsResponse, MediaType
 
 from medialab_jellyfin.core.constants import TAG_LIBRARY
 from medialab_jellyfin.core.limiter import RATE_LIMIT_DEFAULT, limiter
@@ -84,3 +85,16 @@ def get_library_items(
         items=[LibraryItem.from_jellyfin(item) for item in result.items],
         total_record_count=result.total_record_count,
     )
+
+
+@router.get(
+    "/library/tmdb-ids",
+    response_model=LibraryTmdbIdsResponse,
+    status_code=fastapi_status.HTTP_200_OK,
+    summary="List the TMDB ids of every library item of a media type.",
+    responses={**_ERROR_RESPONSES},
+)
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def get_library_tmdb_ids(request: Request, media_type: MediaType) -> LibraryTmdbIdsResponse:
+    tmdb_ids = jellyfin.list_library_tmdb_ids(media_type)
+    return LibraryTmdbIdsResponse(media_type=media_type, tmdb_ids=tmdb_ids)

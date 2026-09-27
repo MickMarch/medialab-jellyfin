@@ -63,6 +63,8 @@ class JellyfinItem(BaseModel):
     name: str = Field(alias="Name")
     type: str | None = Field(alias="Type", default=None)
     provider_ids: dict[str, str | None] | None = Field(alias="ProviderIds", default=None)
+    parent_index_number: int | None = Field(alias="ParentIndexNumber", default=None)
+    index_number: int | None = Field(alias="IndexNumber", default=None)
 
 
 class JellyfinItemsResult(BaseModel):

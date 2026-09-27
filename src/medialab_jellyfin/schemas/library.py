@@ -55,13 +55,14 @@ class JellyfinVirtualFolder(BaseModel):
 
 
 class JellyfinItem(BaseModel):
-    """Jellyfin BaseItemDto shape — subset of fields returned by GET /Items."""
+    """Jellyfin BaseItemDto shape - subset of fields returned by GET /Items."""
 
     model_config = ConfigDict(populate_by_name=True)
 
     id: str = Field(alias="Id")
     name: str = Field(alias="Name")
     type: str | None = Field(alias="Type", default=None)
+    provider_ids: dict[str, str | None] | None = Field(alias="ProviderIds", default=None)
 
 
 class JellyfinItemsResult(BaseModel):

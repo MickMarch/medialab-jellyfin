@@ -1,6 +1,7 @@
 """Jellyfin API client: connection setup, reachability checks, and library operations."""
 
 import requests
+from medialab_contracts import MediaType
 
 from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.errors import AppException, ErrorCode
@@ -17,6 +18,18 @@ _PATH_VIRTUAL_FOLDERS = "/Library/VirtualFolders"
 _PATH_VIRTUAL_FOLDER_PATHS = "/Library/VirtualFolders/Paths"
 _PATH_MEDIA_UPDATED = "/Library/Media/Updated"
 _PATH_ITEMS = "/Items"
+
+_PARAM_INCLUDE_ITEM_TYPES = "IncludeItemTypes"
+_PARAM_RECURSIVE = "Recursive"
+_PARAM_FIELDS = "Fields"
+_QUERY_TRUE = "true"
+_FIELD_PROVIDER_IDS = "ProviderIds"
+_PROVIDER_ID_TMDB = "Tmdb"
+
+_ITEM_TYPE_BY_MEDIA_TYPE: dict[MediaType, str] = {
+    MediaType.MOVIE: "Movie",
+    MediaType.SHOW: "Series",
+}
 
 _COLLECTION_TYPE_MAP: dict[str, str] = {
     "movie": "movies",
@@ -139,3 +152,29 @@ def search_items(
     )
     _raise_if_unavailable(response)
     return JellyfinItemsResult.model_validate(response.json())
+
+
+def _parse_tmdb_id(provider_ids: dict[str, str | None] | None) -> int | None:
+    raw = (provider_ids or {}).get(_PROVIDER_ID_TMDB)
+    if raw is None or not raw.strip().isdigit():
+        return None
+    return int(raw)
+
+
+def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
+    """Return the distinct TMDB ids of every library item of the given media type."""
+    params = {
+        _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
+        _PARAM_RECURSIVE: _QUERY_TRUE,
+        _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
+    }
+    response = requests.get(
+        f"{_base_url()}{_PATH_ITEMS}",
+        headers=_auth_headers(),
+        params=params,
+        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_if_unavailable(response)
+    result = JellyfinItemsResult.model_validate(response.json())
+    tmdb_ids = (_parse_tmdb_id(item.provider_ids) for item in result.items)
+    return list(dict.fromkeys(tmdb_id for tmdb_id in tmdb_ids if tmdb_id is not None))

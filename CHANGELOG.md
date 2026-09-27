@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `GET /api/v1/library/episodes?tmdb_id=<int>` lists the distinct, sorted
+  `(season, episode)` keys of every Episode item under the Series with that
+  TMDB id, as the contracts `LibraryEpisodesResponse`; a series not in the
+  library returns an empty list (MickMarch/medialab#91).
+
+### Changed
+
+- medialab-contracts dependency bumped to v0.11.0.
+
 ## [1.2.0] - 2026-09-27
 
 ### Added

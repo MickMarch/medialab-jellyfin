@@ -1,8 +1,8 @@
-"""Library router: scan trigger, path management, item search, and TMDB id listing."""
+"""Library router: scan trigger, path management, item search, TMDB id and episode listing."""
 
 from fastapi import APIRouter, Query, Request
 from fastapi import status as fastapi_status
-from medialab_contracts import LibraryTmdbIdsResponse, MediaType
+from medialab_contracts import LibraryEpisodesResponse, LibraryTmdbIdsResponse, MediaType
 
 from medialab_jellyfin.core.constants import TAG_LIBRARY
 from medialab_jellyfin.core.limiter import RATE_LIMIT_DEFAULT, limiter
@@ -98,3 +98,16 @@ def get_library_items(
 def get_library_tmdb_ids(request: Request, media_type: MediaType) -> LibraryTmdbIdsResponse:
     tmdb_ids = jellyfin.list_library_tmdb_ids(media_type)
     return LibraryTmdbIdsResponse(media_type=media_type, tmdb_ids=tmdb_ids)
+
+
+@router.get(
+    "/library/episodes",
+    response_model=LibraryEpisodesResponse,
+    status_code=fastapi_status.HTTP_200_OK,
+    summary="List the (season, episode) keys of a series present in the library.",
+    responses={**_ERROR_RESPONSES},
+)
+@limiter.limit(RATE_LIMIT_DEFAULT)
+def get_library_episodes(request: Request, tmdb_id: int) -> LibraryEpisodesResponse:
+    episodes = jellyfin.list_library_episodes(tmdb_id)
+    return LibraryEpisodesResponse(tmdb_id=tmdb_id, episodes=episodes)

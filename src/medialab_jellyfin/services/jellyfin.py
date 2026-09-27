@@ -1,7 +1,7 @@
 """Jellyfin API client: connection setup, reachability checks, and library operations."""
 
 import requests
-from medialab_contracts import MediaType
+from medialab_contracts import EpisodeKey, MediaType
 
 from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.errors import AppException, ErrorCode
@@ -22,9 +22,14 @@ _PATH_ITEMS = "/Items"
 _PARAM_INCLUDE_ITEM_TYPES = "IncludeItemTypes"
 _PARAM_RECURSIVE = "Recursive"
 _PARAM_FIELDS = "Fields"
+_PARAM_PARENT_ID = "ParentId"
 _QUERY_TRUE = "true"
 _FIELD_PROVIDER_IDS = "ProviderIds"
+_FIELD_PARENT_INDEX_NUMBER = "ParentIndexNumber"
+_FIELD_INDEX_NUMBER = "IndexNumber"
+_FIELDS_SEPARATOR = ","
 _PROVIDER_ID_TMDB = "Tmdb"
+_ITEM_TYPE_EPISODE = "Episode"
 
 _ITEM_TYPE_BY_MEDIA_TYPE: dict[MediaType, str] = {
     MediaType.MOVIE: "Movie",
@@ -161,13 +166,7 @@ def _parse_tmdb_id(provider_ids: dict[str, str | None] | None) -> int | None:
     return int(raw)
 
 
-def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
-    """Return the distinct TMDB ids of every library item of the given media type."""
-    params = {
-        _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
-        _PARAM_RECURSIVE: _QUERY_TRUE,
-        _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
-    }
+def _get_items(params: dict[str, str]) -> JellyfinItemsResult:
     response = requests.get(
         f"{_base_url()}{_PATH_ITEMS}",
         headers=_auth_headers(),
@@ -175,6 +174,56 @@ def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
         timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
     )
     _raise_if_unavailable(response)
-    result = JellyfinItemsResult.model_validate(response.json())
+    return JellyfinItemsResult.model_validate(response.json())
+
+
+def _list_items_with_provider_ids(media_type: MediaType) -> JellyfinItemsResult:
+    return _get_items(
+        {
+            _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
+            _PARAM_RECURSIVE: _QUERY_TRUE,
+            _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
+        }
+    )
+
+
+def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
+    """Return the distinct TMDB ids of every library item of the given media type."""
+    result = _list_items_with_provider_ids(media_type)
     tmdb_ids = (_parse_tmdb_id(item.provider_ids) for item in result.items)
     return list(dict.fromkeys(tmdb_id for tmdb_id in tmdb_ids if tmdb_id is not None))
+
+
+def _find_series_id(tmdb_id: int) -> str | None:
+    result = _list_items_with_provider_ids(MediaType.SHOW)
+    for item in result.items:
+        if _parse_tmdb_id(item.provider_ids) == tmdb_id:
+            return item.id
+    return None
+
+
+def list_library_episodes(tmdb_id: int) -> list[EpisodeKey]:
+    """Return the sorted, distinct (season, episode) keys of a series' library episodes.
+
+    A series not in the library yields an empty list.
+    """
+    series_id = _find_series_id(tmdb_id)
+    if series_id is None:
+        return []
+
+    result = _get_items(
+        {
+            _PARAM_PARENT_ID: series_id,
+            _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_EPISODE,
+            _PARAM_RECURSIVE: _QUERY_TRUE,
+            _PARAM_FIELDS: _FIELDS_SEPARATOR.join(
+                (_FIELD_PARENT_INDEX_NUMBER, _FIELD_INDEX_NUMBER)
+            ),
+        }
+    )
+    keys = {
+        (item.parent_index_number, item.index_number)
+        for item in result.items
+        if item.parent_index_number is not None and item.index_number is not None
+    }
+    return [EpisodeKey(season=season, episode=episode) for season, episode in sorted(keys)]

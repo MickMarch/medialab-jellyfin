@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- urllib3 bumped to 2.8.0 for PYSEC-2026-4175, PYSEC-2026-4176 and PYSEC-2026-4177.
+
 ## [1.3.0] - 2026-09-27
 
 ### Added

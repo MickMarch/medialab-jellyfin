@@ -1,9 +1,10 @@
 """Jellyfin API client: connection setup, reachability checks, and library operations."""
 
 import requests
-from medialab_contracts import EpisodeKey, MediaType
+from medialab_contracts import CREDENTIAL_JELLYFIN_API_KEY, EpisodeKey, MediaType
 
 from medialab_jellyfin.core.config import config
+from medialab_jellyfin.core.credentials import credentials
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.logger import app_logger
 from medialab_jellyfin.schemas.library import (
@@ -14,6 +15,8 @@ from medialab_jellyfin.schemas.library import (
 JELLYFIN_REQUEST_TIMEOUT_SECONDS = 5
 
 _PATH_SYSTEM_INFO = "/System/Info/Public"
+_PATH_SYSTEM_INFO_AUTHENTICATED = "/System/Info"
+HTTP_STATUS_UNAUTHORIZED = 401
 _PATH_VIRTUAL_FOLDERS = "/Library/VirtualFolders"
 _PATH_VIRTUAL_FOLDER_PATHS = "/Library/VirtualFolders/Paths"
 _PATH_MEDIA_UPDATED = "/Library/Media/Updated"
@@ -51,12 +54,39 @@ def _auth_headers() -> dict[str, str]:
 
 
 def _raise_if_unavailable(response: requests.Response) -> None:
+    """Every authenticated call ends here: classify the key, then fail on any error."""
+    if response.status_code == HTTP_STATUS_UNAUTHORIZED:
+        credentials.mark_invalid(
+            CREDENTIAL_JELLYFIN_API_KEY, f"Jellyfin returned HTTP {response.status_code}"
+        )
+    elif response.ok:
+        credentials.mark_ok(CREDENTIAL_JELLYFIN_API_KEY)
     if not response.ok:
         raise AppException(
             status_code=503,
             code=ErrorCode.JELLYFIN_UNAVAILABLE,
             detail=f"Jellyfin returned {response.status_code}.",
         )
+
+
+def probe_api_key() -> None:
+    """One authenticated read-only call that exercises the key and records the outcome."""
+    if not config.jellyfin_api_key:
+        credentials.mark_invalid(CREDENTIAL_JELLYFIN_API_KEY, "Jellyfin API key is not configured")
+        return
+    try:
+        response = requests.get(
+            f"{_base_url()}{_PATH_SYSTEM_INFO_AUTHENTICATED}",
+            headers=_auth_headers(),
+            timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+        )
+    except requests.RequestException as error:
+        credentials.mark_unreachable(CREDENTIAL_JELLYFIN_API_KEY, str(error))
+        return
+    try:
+        _raise_if_unavailable(response)
+    except AppException:
+        return
 
 
 def is_reachable() -> bool:

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Credential health: `GET /api/v1/health` reports a `credentials` map for the
+  Jellyfin API key. A 401 on any live call marks it invalid at once; a slow
+  probe (`CREDENTIAL_CHECK_INTERVAL_SECONDS`) covers a key that expires while
+  idle (MickMarch/medialab#136).
+
+### Changed
+
+- medialab-contracts pin moved to the release carrying the credential models.
+
 ## [1.3.1] - 2026-10-04
 
 ### Security

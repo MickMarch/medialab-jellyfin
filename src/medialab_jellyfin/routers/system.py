@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from fastapi import status as fastapi_status
 
 from medialab_jellyfin.core.constants import API_START_TIME, TAG_SYSTEM
+from medialab_jellyfin.core.credentials import credentials
 from medialab_jellyfin.core.limiter import limiter
 from medialab_jellyfin.schemas.system import HealthResponse
 from medialab_jellyfin.services.jellyfin import is_reachable
@@ -28,4 +29,5 @@ def api_health_check() -> HealthResponse:
         status="online",
         uptime_seconds=round(uptime_seconds, 2),
         jellyfin_reachable=is_reachable(),
+        credentials=credentials.snapshot(),
     )

@@ -1,6 +1,9 @@
 """Application entry point: FastAPI app factory and uvicorn launch helpers."""
 
+import asyncio
 import importlib.metadata
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import Depends, FastAPI, Request
@@ -17,8 +20,23 @@ from medialab_jellyfin.core.limiter import limiter
 from medialab_jellyfin.core.logger import app_logger
 from medialab_jellyfin.core.middleware import RequestLoggingMiddleware
 from medialab_jellyfin.routers import library, system
+from medialab_jellyfin.services.credential_probe import run_probe_loop
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Run the slow credential probe for the life of the process."""
+    stop = asyncio.Event()
+    task = asyncio.create_task(run_probe_loop(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        task.cancel()
+
 
 app: FastAPI = FastAPI(
+    lifespan=lifespan,
     title="Medialab Jellyfin API",
     version=importlib.metadata.version("medialab-jellyfin"),
     description=(

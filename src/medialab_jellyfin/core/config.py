@@ -3,6 +3,9 @@
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+SECONDS_PER_HOUR = 3600
+CREDENTIAL_CHECK_INTERVAL_DEFAULT = SECONDS_PER_HOUR * 6
+
 
 class AppConfig(BaseSettings):
     """Application configuration parameters."""
@@ -12,6 +15,8 @@ class AppConfig(BaseSettings):
     jellyfin_host: str = Field(default="127.0.0.1")
     jellyfin_port: int = Field(default=8096)
     jellyfin_api_key: str | None = Field(default=None)
+    # How often the slow credential probe exercises the Jellyfin key.
+    credential_check_interval_seconds: int = Field(default=CREDENTIAL_CHECK_INTERVAL_DEFAULT)
 
     api_key: str | None = Field(default=None)
     api_host: str = Field(default="0.0.0.0")

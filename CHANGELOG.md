@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Discover placeholders for requesting titles from inside Jellyfin clients
+  (MickMarch/medialab#142): `PUT` / `DELETE /discover/placeholders/{media_type}/{tmdb_id}`
+  write and remove placeholder folders (`.nfo` plus a copy of the bundled
+  request clip), `GET /discover/placeholders` lists them with their state,
+  `POST /discover/refresh` rescans a Discover library, and
+  `GET /discover/favorites` returns a user's favorites on placeholders or on
+  the real library. New `DISCOVER_MOUNT_PATH` setting and
+  `DISCOVER_NOT_CONFIGURED` error code.
+
+### Changed
+
+- medialab-contracts pin to v1.4.0.
+
+### Security
+
+- Bump `certifi` to 2026.10.23 for PYSEC-2026-4320.
+
 ## [1.4.0] - 2026-10-07
 
 ### Added

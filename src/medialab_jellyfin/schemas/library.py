@@ -52,6 +52,7 @@ class JellyfinVirtualFolder(BaseModel):
 
     name: str = Field(alias="Name")
     collection_type: str | None = Field(alias="CollectionType", default=None)
+    item_id: str | None = Field(alias="ItemId", default=None)
 
 
 class JellyfinItem(BaseModel):

@@ -18,6 +18,10 @@ class AppConfig(BaseSettings):
     # How often the slow credential probe exercises the Jellyfin key.
     credential_check_interval_seconds: int = Field(default=CREDENTIAL_CHECK_INTERVAL_DEFAULT)
 
+    # Discover placeholder root as this process sees it (the container mount);
+    # Jellyfin reads the same directory through its own path.
+    discover_mount_path: str | None = Field(default=None)
+
     api_key: str | None = Field(default=None)
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8001)

@@ -19,7 +19,7 @@ from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.limiter import limiter
 from medialab_jellyfin.core.logger import app_logger
 from medialab_jellyfin.core.middleware import RequestLoggingMiddleware
-from medialab_jellyfin.routers import library, system
+from medialab_jellyfin.routers import discover, library, system
 from medialab_jellyfin.services.credential_probe import run_probe_loop
 
 
@@ -103,6 +103,7 @@ async def validation_exception_handler(
 
 app.include_router(system.router, prefix=API_PREFIX)
 app.include_router(library.router, prefix=API_PREFIX, dependencies=[Depends(verify_api_key)])
+app.include_router(discover.router, prefix=API_PREFIX, dependencies=[Depends(verify_api_key)])
 
 
 def custom_openapi() -> dict:

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - medialab-contracts pin to v1.4.0.
 
+### Security
+
+- Bump `certifi` to 2026.10.23 for PYSEC-2026-4320.
+
 ## [1.4.0] - 2026-10-07
 
 ### Added

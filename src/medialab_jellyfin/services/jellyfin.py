@@ -1,13 +1,21 @@
 """Jellyfin API client: connection setup, reachability checks, and library operations."""
 
 import requests
-from medialab_contracts import CREDENTIAL_JELLYFIN_API_KEY, EpisodeKey, MediaType
+from medialab_contracts import (
+    CREDENTIAL_JELLYFIN_API_KEY,
+    DISCOVER_LIBRARY_NAMES,
+    EpisodeKey,
+    JellyfinRequestEvent,
+    MediaType,
+)
 
 from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.credentials import credentials
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.logger import app_logger
+from medialab_jellyfin.schemas.discover import FavoriteScope
 from medialab_jellyfin.schemas.library import (
+    JellyfinItem,
     JellyfinItemsResult,
     JellyfinVirtualFolder,
 )
@@ -21,12 +29,25 @@ _PATH_VIRTUAL_FOLDERS = "/Library/VirtualFolders"
 _PATH_VIRTUAL_FOLDER_PATHS = "/Library/VirtualFolders/Paths"
 _PATH_MEDIA_UPDATED = "/Library/Media/Updated"
 _PATH_ITEMS = "/Items"
+_PATH_ITEM_REFRESH = "/Items/{item_id}/Refresh"
+_PATH_USER_ITEMS = "/Users/{user_id}/Items"
 
 _PARAM_INCLUDE_ITEM_TYPES = "IncludeItemTypes"
 _PARAM_RECURSIVE = "Recursive"
 _PARAM_FIELDS = "Fields"
 _PARAM_PARENT_ID = "ParentId"
+_PARAM_FILTERS = "Filters"
+_FILTER_IS_FAVORITE = "IsFavorite"
 _QUERY_TRUE = "true"
+# Default modes re-read local .nfo files and fetch missing remote metadata
+# without replacing what is already there.
+_REFRESH_PARAMS: dict[str, str] = {
+    "Recursive": "true",
+    "MetadataRefreshMode": "Default",
+    "ImageRefreshMode": "Default",
+    "ReplaceAllMetadata": "false",
+    "ReplaceAllImages": "false",
+}
 _FIELD_PROVIDER_IDS = "ProviderIds"
 _FIELD_PARENT_INDEX_NUMBER = "ParentIndexNumber"
 _FIELD_INDEX_NUMBER = "IndexNumber"
@@ -196,9 +217,9 @@ def _parse_tmdb_id(provider_ids: dict[str, str | None] | None) -> int | None:
     return int(raw)
 
 
-def _get_items(params: dict[str, str]) -> JellyfinItemsResult:
+def _get_items(params: dict[str, str], path: str = _PATH_ITEMS) -> JellyfinItemsResult:
     response = requests.get(
-        f"{_base_url()}{_PATH_ITEMS}",
+        f"{_base_url()}{path}",
         headers=_auth_headers(),
         params=params,
         timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
@@ -257,3 +278,79 @@ def list_library_episodes(tmdb_id: int) -> list[EpisodeKey]:
         if item.parent_index_number is not None and item.index_number is not None
     }
     return [EpisodeKey(season=season, episode=episode) for season, episode in sorted(keys)]
+
+
+def discover_library_ids() -> dict[MediaType, str]:
+    """Item id of each Discover library, found by its contract name.
+
+    Raises LIBRARY_NOT_FOUND when either library has not been created.
+    """
+    response = requests.get(
+        f"{_base_url()}{_PATH_VIRTUAL_FOLDERS}",
+        headers=_auth_headers(),
+        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_if_unavailable(response)
+    folders = [JellyfinVirtualFolder.model_validate(f) for f in response.json()]
+    ids_by_name = {f.name: f.item_id for f in folders if f.item_id}
+    missing = [name for name in DISCOVER_LIBRARY_NAMES.values() if name not in ids_by_name]
+    if missing:
+        raise AppException(
+            status_code=404,
+            code=ErrorCode.LIBRARY_NOT_FOUND,
+            detail=f"Discover libraries not found in Jellyfin: {', '.join(missing)}.",
+        )
+    return {media_type: ids_by_name[name] for media_type, name in DISCOVER_LIBRARY_NAMES.items()}
+
+
+def refresh_item(item_id: str) -> None:
+    """Rescan an item (a library, for Discover) and re-read its local metadata."""
+    response = requests.post(
+        f"{_base_url()}{_PATH_ITEM_REFRESH.format(item_id=item_id)}",
+        headers=_auth_headers(),
+        params=_REFRESH_PARAMS,
+        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_if_unavailable(response)
+
+
+def _user_favorites(user_id: str, parent_id: str | None) -> JellyfinItemsResult:
+    params = {
+        _PARAM_FILTERS: _FILTER_IS_FAVORITE,
+        _PARAM_INCLUDE_ITEM_TYPES: _FIELDS_SEPARATOR.join(_ITEM_TYPE_BY_MEDIA_TYPE.values()),
+        _PARAM_RECURSIVE: _QUERY_TRUE,
+        _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
+    }
+    if parent_id is not None:
+        params[_PARAM_PARENT_ID] = parent_id
+    return _get_items(params, path=_PATH_USER_ITEMS.format(user_id=user_id))
+
+
+def _to_event(user_id: str, item: JellyfinItem) -> JellyfinRequestEvent | None:
+    tmdb_id = _parse_tmdb_id(item.provider_ids)
+    if tmdb_id is None or item.type is None:
+        return None
+    return JellyfinRequestEvent(
+        jellyfin_user_id=user_id,
+        item_id=item.id,
+        item_type=item.type,
+        tmdb_id=tmdb_id,
+        is_favorite=True,
+    )
+
+
+def list_favorites(user_id: str, scope: FavoriteScope) -> list[JellyfinRequestEvent]:
+    """One user's favorited movies and series with a TMDB id: on Discover
+    placeholders, or on real library items (everything outside Discover)."""
+    discover_items = [
+        item
+        for library_id in discover_library_ids().values()
+        for item in _user_favorites(user_id, library_id).items
+    ]
+    if scope is FavoriteScope.DISCOVER:
+        items = discover_items
+    else:
+        discover_ids = {item.id for item in discover_items}
+        items = [i for i in _user_favorites(user_id, None).items if i.id not in discover_ids]
+    events = (_to_event(user_id, item) for item in items)
+    return [event for event in events if event is not None]

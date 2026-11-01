@@ -12,11 +12,10 @@ from medialab_contracts import (
     DISCOVER_CLIP_SUBDIR,
     MEDIA_TYPE_SUBDIRS,
     MediaType,
+    PlaceholderInfo,
     PlaceholderState,
     placeholder_title,
 )
-
-from medialab_jellyfin.schemas.discover import PlaceholderInfo
 
 NFO_FILENAMES: dict[MediaType, str] = {
     MediaType.MOVIE: "movie.nfo",

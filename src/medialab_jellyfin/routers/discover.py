@@ -4,17 +4,18 @@ from pathlib import Path
 
 from fastapi import APIRouter, Query, Request
 from fastapi import status as fastapi_status
-from medialab_contracts import JellyfinRequestEvent, MediaType
+from medialab_contracts import (
+    FavoriteScope,
+    JellyfinRequestEvent,
+    MediaType,
+    PlaceholdersResponse,
+    PlaceholderWrite,
+)
 
 from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.constants import TAG_DISCOVER
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.limiter import RATE_LIMIT_DEFAULT, limiter
-from medialab_jellyfin.schemas.discover import (
-    FavoriteScope,
-    PlaceholdersResponse,
-    PlaceholderWrite,
-)
 from medialab_jellyfin.schemas.errors import ErrorResponse
 from medialab_jellyfin.services import jellyfin, placeholders
 

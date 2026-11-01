@@ -5,6 +5,7 @@ from medialab_contracts import (
     CREDENTIAL_JELLYFIN_API_KEY,
     DISCOVER_LIBRARY_NAMES,
     EpisodeKey,
+    FavoriteScope,
     JellyfinRequestEvent,
     MediaType,
 )
@@ -13,7 +14,6 @@ from medialab_jellyfin.core.config import config
 from medialab_jellyfin.core.credentials import credentials
 from medialab_jellyfin.core.errors import AppException, ErrorCode
 from medialab_jellyfin.core.logger import app_logger
-from medialab_jellyfin.schemas.discover import FavoriteScope
 from medialab_jellyfin.schemas.library import (
     JellyfinItem,
     JellyfinItemsResult,

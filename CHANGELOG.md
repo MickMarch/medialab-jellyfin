@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `.env.example` gives `DISCOVER_MOUNT_PATH` its container path, `/discover`.
+  An empty value made `medialab-setup update` stop and ask for it.
+
 ## [1.5.1] - 2026-11-02
 
 ### Changed

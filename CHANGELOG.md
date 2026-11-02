@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-11-02
+
 ### Fixed
 
 - `.env.example` gives `DISCOVER_MOUNT_PATH` its container path, `/discover`.

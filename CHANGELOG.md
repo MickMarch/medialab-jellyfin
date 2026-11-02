@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Discover endpoint shapes (`PlaceholderWrite`, `PlaceholderInfo`,
+  `PlaceholdersResponse`, `FavoriteScope`) now come from medialab-contracts
+  instead of a local schema module; wire format unchanged
+  (MickMarch/medialab#142).
+
 ## [1.5.0] - 2026-10-30
 
 ### Added

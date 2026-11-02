@@ -7,13 +7,13 @@ import pytest
 from fastapi.testclient import TestClient
 from medialab_contracts import (
     DISCOVER_LIBRARY_NAMES,
+    FavoriteScope,
     JellyfinRequestEvent,
     MediaType,
     PlaceholderState,
 )
 
 from medialab_jellyfin.core.errors import AppException, ErrorCode
-from medialab_jellyfin.schemas.discover import FavoriteScope
 from medialab_jellyfin.services import jellyfin, placeholders
 
 PLACEHOLDER_URL = "/api/v1/discover/placeholders"

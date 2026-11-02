@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `GET /library/tmdb-ids` and `GET /library/episodes` no longer count Discover
+  placeholders as library titles; a request closed at once and its
+  placeholder was removed (MickMarch/medialab#152).
+
 ## [1.5.2] - 2026-11-02
 
 ### Fixed

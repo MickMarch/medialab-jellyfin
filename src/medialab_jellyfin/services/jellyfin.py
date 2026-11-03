@@ -228,26 +228,55 @@ def _get_items(params: dict[str, str], path: str = _PATH_ITEMS) -> JellyfinItems
     return JellyfinItemsResult.model_validate(response.json())
 
 
-def _list_items_with_provider_ids(media_type: MediaType) -> JellyfinItemsResult:
-    return _get_items(
+def _virtual_folder_ids_by_name() -> dict[str, str]:
+    response = requests.get(
+        f"{_base_url()}{_PATH_VIRTUAL_FOLDERS}",
+        headers=_auth_headers(),
+        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_if_unavailable(response)
+    folders = [JellyfinVirtualFolder.model_validate(f) for f in response.json()]
+    return {f.name: f.item_id for f in folders if f.item_id}
+
+
+def _discover_item_ids(media_type: MediaType) -> set[str]:
+    """Item ids of the Discover placeholders of a media type; empty when the
+    Discover library does not exist."""
+    library_id = _virtual_folder_ids_by_name().get(DISCOVER_LIBRARY_NAMES[media_type])
+    if library_id is None:
+        return set()
+    result = _get_items(
+        {
+            _PARAM_PARENT_ID: library_id,
+            _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
+            _PARAM_RECURSIVE: _QUERY_TRUE,
+        }
+    )
+    return {item.id for item in result.items}
+
+
+def _list_items_with_provider_ids(media_type: MediaType) -> list[JellyfinItem]:
+    """Library items of a media type, Discover placeholders excluded."""
+    result = _get_items(
         {
             _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
             _PARAM_RECURSIVE: _QUERY_TRUE,
             _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
         }
     )
+    placeholder_ids = _discover_item_ids(media_type)
+    return [item for item in result.items if item.id not in placeholder_ids]
 
 
 def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
     """Return the distinct TMDB ids of every library item of the given media type."""
-    result = _list_items_with_provider_ids(media_type)
-    tmdb_ids = (_parse_tmdb_id(item.provider_ids) for item in result.items)
+    items = _list_items_with_provider_ids(media_type)
+    tmdb_ids = (_parse_tmdb_id(item.provider_ids) for item in items)
     return list(dict.fromkeys(tmdb_id for tmdb_id in tmdb_ids if tmdb_id is not None))
 
 
 def _find_series_id(tmdb_id: int) -> str | None:
-    result = _list_items_with_provider_ids(MediaType.SHOW)
-    for item in result.items:
+    for item in _list_items_with_provider_ids(MediaType.SHOW):
         if _parse_tmdb_id(item.provider_ids) == tmdb_id:
             return item.id
     return None
@@ -285,14 +314,7 @@ def discover_library_ids() -> dict[MediaType, str]:
 
     Raises LIBRARY_NOT_FOUND when either library has not been created.
     """
-    response = requests.get(
-        f"{_base_url()}{_PATH_VIRTUAL_FOLDERS}",
-        headers=_auth_headers(),
-        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
-    )
-    _raise_if_unavailable(response)
-    folders = [JellyfinVirtualFolder.model_validate(f) for f in response.json()]
-    ids_by_name = {f.name: f.item_id for f in folders if f.item_id}
+    ids_by_name = _virtual_folder_ids_by_name()
     missing = [name for name in DISCOVER_LIBRARY_NAMES.values() if name not in ids_by_name]
     if missing:
         raise AppException(

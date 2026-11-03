@@ -15,6 +15,14 @@ SERVICE_FN = "medialab_jellyfin.routers.library.jellyfin.list_library_episodes"
 SERIES_TMDB_ID = 1396
 SERIES_ID = "series-1396"
 
+_DISCOVER_ITEM_IDS = jellyfin._discover_item_ids
+
+
+@pytest.fixture(autouse=True)
+def no_discover_library(mocker):
+    """Library reads also list the Discover library; these tests start without one."""
+    mocker.patch.object(jellyfin, "_discover_item_ids", return_value=set())
+
 
 def _jellyfin_items(items):
     mock = MagicMock()
@@ -195,3 +203,14 @@ class TestLibraryEpisodesRoute:
             response = client.get(EPISODES_URL, params={"tmdb_id": SERIES_TMDB_ID})
 
         assert "X-Request-ID" in response.headers
+
+
+class TestSeriesLookupExcludesDiscover:
+    def test_a_discover_placeholder_series_is_not_the_library_series(self, mocker):
+        mocker.patch.object(jellyfin, "_discover_item_ids", return_value={"placeholder"})
+        series_items = [_series("placeholder", SERIES_TMDB_ID)]
+        with patch(REQUESTS_GET, return_value=_jellyfin_items(series_items)) as mock_get:
+            result = jellyfin.list_library_episodes(SERIES_TMDB_ID)
+
+        assert result == []
+        assert mock_get.call_count == 1

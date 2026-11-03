@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-11-03
+
 ### Fixed
 
 - `GET /library/tmdb-ids` and `GET /library/episodes` no longer count Discover

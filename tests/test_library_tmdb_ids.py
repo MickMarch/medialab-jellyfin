@@ -12,13 +12,13 @@ TMDB_IDS_URL = "/api/v1/library/tmdb-ids"
 REQUESTS_GET = "medialab_jellyfin.services.jellyfin.requests.get"
 SERVICE_FN = "medialab_jellyfin.routers.library.jellyfin.list_library_tmdb_ids"
 
-_DISCOVER_ITEM_IDS = jellyfin._discover_item_ids
+_RETIRED_DISCOVER_ITEM_IDS = jellyfin._retired_discover_item_ids
 
 
 @pytest.fixture(autouse=True)
-def no_discover_library(mocker):
-    """Library reads also list the Discover library; these tests start without one."""
-    mocker.patch.object(jellyfin, "_discover_item_ids", return_value=set())
+def no_retired_discover_library(mocker):
+    """Library reads skip a leftover retired Discover library; these tests start without one."""
+    mocker.patch.object(jellyfin, "_retired_discover_item_ids", return_value=set())
 
 
 def _jellyfin_items(items):
@@ -151,7 +151,7 @@ class TestLibraryTmdbIdsRoute:
 
 class TestLibraryExcludesDiscover:
     def test_drops_items_that_live_in_the_discover_library(self, mocker):
-        mocker.patch.object(jellyfin, "_discover_item_ids", return_value={"placeholder"})
+        mocker.patch.object(jellyfin, "_retired_discover_item_ids", return_value={"placeholder"})
         items = [_item("owned", {"Tmdb": "603"}), _item("placeholder", {"Tmdb": "238"})]
         with patch(REQUESTS_GET, return_value=_jellyfin_items(items)):
             result = jellyfin.list_library_tmdb_ids(MediaType.MOVIE)
@@ -160,10 +160,12 @@ class TestLibraryExcludesDiscover:
 
     def test_discover_item_ids_lists_the_discover_library_of_the_media_type(self, mocker):
         mocker.patch.object(
-            jellyfin, "_virtual_folder_ids_by_name", return_value={"Discover Movies": "lib-m"}
+            jellyfin,
+            "_virtual_folder_ids_by_name",
+            return_value={jellyfin.RETIRED_DISCOVER_LIBRARY_NAMES[MediaType.MOVIE]: "lib-m"},
         )
         with patch(REQUESTS_GET, return_value=_jellyfin_items([_item("p1", {})])) as mock_get:
-            result = _DISCOVER_ITEM_IDS(MediaType.MOVIE)
+            result = _RETIRED_DISCOVER_ITEM_IDS(MediaType.MOVIE)
 
         assert result == {"p1"}
         assert mock_get.call_args.kwargs["params"]["ParentId"] == "lib-m"
@@ -172,7 +174,7 @@ class TestLibraryExcludesDiscover:
     def test_discover_item_ids_is_empty_without_a_discover_library(self, mocker):
         mocker.patch.object(jellyfin, "_virtual_folder_ids_by_name", return_value={"Movies": "x"})
         with patch(REQUESTS_GET) as mock_get:
-            result = _DISCOVER_ITEM_IDS(MediaType.SHOW)
+            result = _RETIRED_DISCOVER_ITEM_IDS(MediaType.SHOW)
 
         assert result == set()
         mock_get.assert_not_called()

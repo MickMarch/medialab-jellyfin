@@ -15,13 +15,13 @@ SERVICE_FN = "medialab_jellyfin.routers.library.jellyfin.list_library_episodes"
 SERIES_TMDB_ID = 1396
 SERIES_ID = "series-1396"
 
-_DISCOVER_ITEM_IDS = jellyfin._discover_item_ids
+_RETIRED_DISCOVER_ITEM_IDS = jellyfin._retired_discover_item_ids
 
 
 @pytest.fixture(autouse=True)
-def no_discover_library(mocker):
-    """Library reads also list the Discover library; these tests start without one."""
-    mocker.patch.object(jellyfin, "_discover_item_ids", return_value=set())
+def no_retired_discover_library(mocker):
+    """Library reads skip a leftover retired Discover library; these tests start without one."""
+    mocker.patch.object(jellyfin, "_retired_discover_item_ids", return_value=set())
 
 
 def _jellyfin_items(items):
@@ -207,7 +207,7 @@ class TestLibraryEpisodesRoute:
 
 class TestSeriesLookupExcludesDiscover:
     def test_a_discover_placeholder_series_is_not_the_library_series(self, mocker):
-        mocker.patch.object(jellyfin, "_discover_item_ids", return_value={"placeholder"})
+        mocker.patch.object(jellyfin, "_retired_discover_item_ids", return_value={"placeholder"})
         series_items = [_series("placeholder", SERIES_TMDB_ID)]
         with patch(REQUESTS_GET, return_value=_jellyfin_items(series_items)) as mock_get:
             result = jellyfin.list_library_episodes(SERIES_TMDB_ID)

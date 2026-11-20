@@ -35,13 +35,11 @@ an override return a structured error. Jellyfin stays the source of truth for
 library names, so no `JELLYFIN_*_LIBRARY` env vars exist. This endpoint is for
 one-time setup; the per-download pipeline only calls `/library/scan`.
 
-**Discover placeholders:** folders under `DISCOVER_MOUNT_PATH`, found by
-their `[tmdbid-<id>]` suffix so a title change never renames a folder. The
-`.nfo` carries the display title (with the state suffix) for Jellyfin and
-`medialab_title` / `medialab_state` for listing. After writes the whole
-Discover library is refreshed by item id (`/Items/{id}/Refresh`); that picks
-up adds, removals and `.nfo` edits without knowing the host-side path, so no
-path translation exists here.
+**Retired Discover libraries:** `/library/tmdb-ids` and the series lookup
+behind `/library/episodes` skip items in a library named in
+`RETIRED_DISCOVER_LIBRARY_NAMES` (`services/jellyfin.py`), so a leftover
+placeholder never reads as owned. Kept until the libraries are gone from
+every install (MickMarch/medialab#168).
 
 **Cross-cutting:** `X-API-Key` via `Security(APIKeyHeader)` in `core/auth.py`,
 applied on `include_router` (system router public so `/health` needs no key).
@@ -54,13 +52,11 @@ applied on `include_router` (system router public so `/health` needs no key).
 ```
 src/medialab_jellyfin/
 ├── core/        config, auth, limiter, middleware, logger, errors, constants
-├── services/    jellyfin (client, reachability, library operations, Discover
-│                library ids, item refresh, user favorites),
-│                placeholders (Discover folders on disk: .nfo + clip copy)
+├── services/    jellyfin (client, reachability, library operations),
+│                credential_probe (slow Jellyfin key check loop)
 ├── schemas/     library (scan/paths/items request + response, Jellyfin DTOs),
-│                discover, system, errors
-├── assets/      request.mp4, the clip every placeholder copies
-├── routers/     system, library, discover (registered in main.py under /api/v1)
+│                system, errors
+├── routers/     system, library (registered in main.py under /api/v1)
 └── main.py      app, middleware, exception handlers, custom OpenAPI
 ```
 

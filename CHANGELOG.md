@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** the Discover placeholder routes are gone
+  (MickMarch/medialab#168). `PUT` / `DELETE /discover/placeholders/{media_type}/{tmdb_id}`,
+  `GET /discover/placeholders`, `POST /discover/refresh` and
+  `GET /discover/favorites` now return `404`. The bundled request clip, the
+  per-user favorites reader, the `DISCOVER_MOUNT_PATH` setting and the
+  `DISCOVER_NOT_CONFIGURED` error code are removed with them.
+
+### Changed
+
+- `GET /library/tmdb-ids` and `GET /library/episodes` still skip items in a
+  library named "Discover Movies" or "Discover Shows", now matched by a local
+  constant instead of the contracts names. The retired libraries stay
+  excluded until they are removed from every install.
+
 ## [1.5.3] - 2026-11-03
 
 ### Fixed

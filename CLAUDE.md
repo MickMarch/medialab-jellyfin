@@ -35,6 +35,12 @@ an override return a structured error. Jellyfin stays the source of truth for
 library names, so no `JELLYFIN_*_LIBRARY` env vars exist. This endpoint is for
 one-time setup; the per-download pipeline only calls `/library/scan`.
 
+**Retired Discover libraries:** `/library/tmdb-ids` and the series lookup
+behind `/library/episodes` skip items in a library named in
+`RETIRED_DISCOVER_LIBRARY_NAMES` (`services/jellyfin.py`), so a leftover
+placeholder never reads as owned. Kept until the libraries are gone from
+every install (MickMarch/medialab#168).
+
 **Cross-cutting:** `X-API-Key` via `Security(APIKeyHeader)` in `core/auth.py`,
 applied on `include_router` (system router public so `/health` needs no key).
 `slowapi` `RATE_LIMIT_DEFAULT` in `core/limiter.py`, `/health` exempt.

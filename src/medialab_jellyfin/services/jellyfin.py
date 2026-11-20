@@ -44,6 +44,14 @@ _ITEM_TYPE_BY_MEDIA_TYPE: dict[MediaType, str] = {
     MediaType.SHOW: "Series",
 }
 
+# The Discover libraries were retired (MickMarch/medialab#168). An install
+# where teardown has not removed them yet still lists their placeholder items,
+# which must never read as owned titles.
+RETIRED_DISCOVER_LIBRARY_NAMES: dict[MediaType, str] = {
+    MediaType.MOVIE: "Discover Movies",
+    MediaType.SHOW: "Discover Shows",
+}
+
 _COLLECTION_TYPE_MAP: dict[str, str] = {
     "movie": "movies",
     "show": "tvshows",
@@ -212,8 +220,35 @@ def _get_items(params: dict[str, str]) -> JellyfinItemsResult:
     return JellyfinItemsResult.model_validate(response.json())
 
 
+def _virtual_folder_ids_by_name() -> dict[str, str]:
+    response = requests.get(
+        f"{_base_url()}{_PATH_VIRTUAL_FOLDERS}",
+        headers=_auth_headers(),
+        timeout=JELLYFIN_REQUEST_TIMEOUT_SECONDS,
+    )
+    _raise_if_unavailable(response)
+    folders = [JellyfinVirtualFolder.model_validate(f) for f in response.json()]
+    return {f.name: f.item_id for f in folders if f.item_id}
+
+
+def _retired_discover_item_ids(media_type: MediaType) -> set[str]:
+    """Item ids in a leftover retired Discover library of a media type; empty
+    once that library is gone."""
+    library_id = _virtual_folder_ids_by_name().get(RETIRED_DISCOVER_LIBRARY_NAMES[media_type])
+    if library_id is None:
+        return set()
+    result = _get_items(
+        {
+            _PARAM_PARENT_ID: library_id,
+            _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
+            _PARAM_RECURSIVE: _QUERY_TRUE,
+        }
+    )
+    return {item.id for item in result.items}
+
+
 def _list_items_with_provider_ids(media_type: MediaType) -> list[JellyfinItem]:
-    """Library items of a media type."""
+    """Library items of a media type, leftover retired Discover items excluded."""
     result = _get_items(
         {
             _PARAM_INCLUDE_ITEM_TYPES: _ITEM_TYPE_BY_MEDIA_TYPE[media_type],
@@ -221,7 +256,8 @@ def _list_items_with_provider_ids(media_type: MediaType) -> list[JellyfinItem]:
             _PARAM_FIELDS: _FIELD_PROVIDER_IDS,
         }
     )
-    return result.items
+    retired_ids = _retired_discover_item_ids(media_type)
+    return [item for item in result.items if item.id not in retired_ids]
 
 
 def list_library_tmdb_ids(media_type: MediaType) -> list[int]:
